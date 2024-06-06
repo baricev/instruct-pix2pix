@@ -28,7 +28,7 @@ from tqdm.auto import tqdm
 from transformers import CLIPTokenizer, FlaxCLIPTextModel, set_seed
 from functools import partial
 from tensorboardX import SummaryWriter
-
+import tensorflow as tf
 
 import copy
 from typing import Any
@@ -48,75 +48,13 @@ from diffusers import (
 )
 from diffusers.pipelines.stable_diffusion import FlaxStableDiffusionSafetyChecker
 
-
 from config import args
-
-logger = logging.getLogger(__name__)
-
-import tensorflow as tf
 
 OPTIONS = tf.data.Options()
 OPTIONS.deterministic = True
 OPTIONS.autotune.enabled = True
 
-# --------------------------------------------------------------------------------
-
-
-def visualize_image(batch, n, tokenizer=None):
-    # {'key': batched array -> (B,3,256,256): 'input_ids': batched array (B,77), 'prompt': batched array (B,77)}
-
-    # Get the nth sample from the batch
-    original_image= batch["original_pixel_values"][n]
-    edited_image= batch["edited_pixel_values"][n]
-    prompt= batch["input_ids"][n]
-
-    # Transpose the images from (3, 256, 256) -> (256, 256, 3) for visualization
-    original_image = original_image.transpose(1, 2, 0)
-    edited_image = edited_image.transpose(1, 2, 0)
-    
-    assert original_image.shape == (256, 256, 3) 
-    assert edited_image.shape == (256, 256, 3) 
-
-    # Reverse the preprocessing step:
-    #   images = 2 * (images / 255) - 1
-    # which set the pixel values in the range [-1, 1]. PIL Images are in the range [0,255] range and np.uint8 type
-    original_image = Image.fromarray(((original_image + 1) * 127.5).astype(np.uint8))
-    edited_image = Image.fromarray(((edited_image + 1) * 127.5).astype(np.uint8))
-
-    # Display images
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    axes[0].imshow(original_image)
-
-    axes[0].imshow(original_image)
-    axes[0].set_title("Original Image")
-    axes[0].axis("off")
-
-    axes[1].imshow(edited_image)
-    axes[1].set_title("Edited Image")
-    axes[1].axis("off")
-
-    plt.show()
-    
-    # Print the prompt, without special tokens and padding
-    print("Prompt:", tokenizer.decode(prompt, skip_special_tokens=True))
-
-
-def collate_fn(examples):
-    original_pixel_values = torch.stack([example["original_pixel_values"] for example in examples])
-    original_pixel_values = original_pixel_values.to(memory_format=torch.contiguous_format).float()
-
-    edited_pixel_values = torch.stack([example["edited_pixel_values"] for example in examples])
-    edited_pixel_values = edited_pixel_values.to(memory_format=torch.contiguous_format).float()
-
-    input_ids = torch.stack([example["input_ids"] for example in examples])
-
-    batch = {
-        "original_pixel_values": original_pixel_values,
-        "edited_pixel_values": edited_pixel_values,
-        "input_ids": input_ids,
-    }
-    batch = {k: v.numpy() for k, v in batch.items()}
-    return batch
+logger = logging.getLogger(__name__)
 
 
 def make_train_dataset(args, batch_size=None):
@@ -1106,4 +1044,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
